@@ -29,7 +29,6 @@ class StockData(Dataset):
 
             self.data.append((lastinputLengthDays, nextoutputLengthDays))
 
-
     def __len__(self):
         return len(self.data)
 
@@ -47,6 +46,8 @@ class LSTM(nn.Module):
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x):
+        x = x.permute(1, 0, 2)
+
         # set initial hidden and cell states
         h0 = torch.zeros(self.num_layers, x.size(1), self.hidden_size).to(torch.device('cuda'))
         c0 = torch.zeros(self.num_layers, x.size(1), self.hidden_size).to(torch.device('cuda'))
@@ -57,5 +58,6 @@ class LSTM(nn.Module):
         # dropout and fully connected layer
         out = self.dropout(out[-1])
         out = self.fc(out)
+        out = out.unsqueeze(-1)
 
         return out
