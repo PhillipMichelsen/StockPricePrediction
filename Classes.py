@@ -11,23 +11,23 @@ from sklearn.preprocessing import MinMaxScaler
 
 
 class StockData(Dataset):
-    def __init__(self, data, inputLength = 90, outputLength = 14):
-        currentData = pd.DataFrame(data)
+    def __init__(self, data, input_length=90, output_length=14):
+        current_data = pd.DataFrame(data)
         self.data = []
         self.inputScaler = MinMaxScaler()
         self.outputScaler = MinMaxScaler()
 
-        self.inputScaler.fit(currentData)
-        self.outputScaler.fit(currentData['Close'].values.reshape(-1,1))
+        self.inputScaler.fit(current_data)
+        self.outputScaler.fit(current_data['Close'].values.reshape(-1, 1))
 
-        for i in range(inputLength, len(currentData) - outputLength):
-            lastinputLengthDays = currentData.iloc[i - inputLength : i].values
-            nextoutputLengthDays = currentData['Close'].iloc[i : i + outputLength].values.reshape(-1,1)
+        for i in range(input_length, len(current_data) - output_length):
+            last_input_length_days = current_data.iloc[i - input_length: i].values
+            next_output_length_days = current_data['Close'].iloc[i: i + output_length].values.reshape(-1, 1)
 
-            lastinputLengthDays = self.inputScaler.transform(lastinputLengthDays)
-            nextoutputLengthDays = self.outputScaler.transform(nextoutputLengthDays)
+            last_input_length_days = self.inputScaler.transform(last_input_length_days)
+            next_output_length_days = self.outputScaler.transform(next_output_length_days)
 
-            self.data.append((lastinputLengthDays, nextoutputLengthDays))
+            self.data.append((last_input_length_days, next_output_length_days))
 
     def __len__(self):
         return len(self.data)
