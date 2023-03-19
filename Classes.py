@@ -37,26 +37,24 @@ class StockData(Dataset):
 
 
 class LSTM(nn.Module):
-    def __init__(self, input_size, hidden_size, num_layers, output_size, dropout=0.2):
+    def __init__(self, input_size, hidden_size, num_layers, output_size, dropout=0.3):
         super(LSTM, self).__init__()
         self.hidden_size = hidden_size
         self.num_layers = num_layers
-        self.lstm = nn.LSTM(input_size, hidden_size, num_layers, dropout=dropout)
+
+        self.lstm = nn.LSTM(input_size, hidden_size, num_layers, dropout=dropout, batch_first=True)
         self.fc = nn.Linear(hidden_size, output_size)
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x):
-        x = x.permute(1, 0, 2)
+        batch_size = x.size(0)
+        h0 = torch.zeros(self.num_layers, batch_size, self.hidden_size).to(x.device)
+        c0 = torch.zeros(self.num_layers, batch_size, self.hidden_size).to(x.device)
 
-        # set initial hidden and cell states
-        h0 = torch.zeros(self.num_layers, x.size(1), self.hidden_size).to(torch.device('cuda'))
-        c0 = torch.zeros(self.num_layers, x.size(1), self.hidden_size).to(torch.device('cuda'))
+        x = self.dropout(x)
 
-        # forward propagate LSTM
-        out, _ = self.lstm(x, (h0, c0))  # out: tensor of shape (batch_size, seq_length, hidden_size)
-
-        # dropout and fully connected layer
-        out = self.dropout(out[-1])
+        out, _ = self.lstm(x, (h0, c0))
+        out = out[:, -1, :]
         out = self.fc(out)
         out = out.unsqueeze(-1)
 

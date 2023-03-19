@@ -11,7 +11,7 @@ from Classes import StockData, LSTM
 import matplotlib.pyplot as plt
 
 # Parameters
-TRAIN_DATASET_DIRECTORY = 'Data/Datasets/Stock_100'
+TRAIN_DATASETS_DIRECTORY = 'Data/Datasets/Stock_100'
 # TEST_DATASET_FILE = 'Data/Datasets/'
 DATASET_SPLIT = [0.8, 0.2]
 NUM_EPOCHS = 50
@@ -41,7 +41,7 @@ print(f'Batch size - {BATCH_SIZE}')
 torch.cuda.is_available()
 device = torch.device('cuda')
 
-dataset_names = os.listdir(TRAIN_DATASET_DIRECTORY)
+dataset_names = os.listdir(TRAIN_DATASETS_DIRECTORY)
 dataset_names.sort(key=lambda x: float(x.split('_')[1][2:].rstrip('.pt')))
 
 for i, dataset in enumerate(dataset_names):
@@ -60,7 +60,7 @@ for i, dataset in enumerate(dataset_names):
 
     model.to(device)
 
-    main_dataset = torch.load(f'{TRAIN_DATASET_DIRECTORY}/{dataset}')
+    main_dataset = torch.load(f'{TRAIN_DATASETS_DIRECTORY}/{dataset}')
     # test_dataset = torch.load(TEST_DATASET_FILE)
 
     train_dataset, validation_dataset = torch.utils.data.random_split(main_dataset, DATASET_SPLIT)
