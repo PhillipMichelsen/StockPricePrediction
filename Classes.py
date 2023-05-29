@@ -1,17 +1,12 @@
-import os
-
 import torch
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset
 import torch.nn as nn
 import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-
 from sklearn.preprocessing import MinMaxScaler
 
 
 class StockData(Dataset):
-    def __init__(self, data, input_length=90, output_length=14):
+    def __init__(self, data, input_length=90, output_length=1):
         current_data = pd.DataFrame(data)
         self.data = []
         self.inputScaler = MinMaxScaler()
@@ -27,7 +22,7 @@ class StockData(Dataset):
             last_input_length_days = self.inputScaler.transform(last_input_length_days)
             next_output_length_days = self.outputScaler.transform(next_output_length_days)
 
-            self.data.append((last_input_length_days, next_output_length_days))
+            self.data.append((torch.FloatTensor(last_input_length_days), torch.FloatTensor(next_output_length_days)))
 
     def __len__(self):
         return len(self.data)
@@ -36,26 +31,82 @@ class StockData(Dataset):
         return self.data[idx]
 
 
-class LSTM(nn.Module):
-    def __init__(self, input_size, hidden_size, num_layers, output_size, dropout=0.3):
-        super(LSTM, self).__init__()
-        self.hidden_size = hidden_size
-        self.num_layers = num_layers
+class ConvLSTM(nn.Module):
+    def __init__(self, input_features,
+                 conv_hidden_sizes, kernel_size,
+                 lstm_hidden_sizes,
+                 output_features, dropout=0.1
+                 ):
 
-        self.lstm = nn.LSTM(input_size, hidden_size, num_layers, dropout=dropout, batch_first=True)
-        self.fc = nn.Linear(hidden_size, output_size)
+        super(ConvLSTM, self).__init__()
+
+        self.input_features = input_features
+
+        self.conv_hidden_sizes = conv_hidden_sizes
+        self.kernel_size = kernel_size
+        self.lstm_hidden_sizes = lstm_hidden_sizes
+
+        self.conv_layers = nn.ModuleList()
+        self.lstm_layers = nn.ModuleList()
+
+        self.conv1d = nn.Conv1d(15, 32, 3)
+
+        for i, hidden_size in enumerate(self.conv_hidden_sizes):
+            if i == 0:
+                self.conv_layers.append(nn.Conv1d(
+                    self.input_features, hidden_size, self.kernel_size)
+                )
+            else:
+                self.conv_layers.append(nn.Conv1d(
+                    self.conv_hidden_sizes[i-1], hidden_size, self.kernel_size)
+                )
+
+        for i, hidden_size in enumerate(self.lstm_hidden_sizes):
+            if i == 0:
+                self.lstm_layers.append(nn.LSTM(
+                    self.conv_hidden_sizes[-1], hidden_size, batch_first=True)
+                )
+            else:
+                self.lstm_layers.append(nn.LSTM(
+                    self.lstm_hidden_sizes[i-1], hidden_size, batch_first=True)
+                )
+
+        self.fc = nn.Linear(lstm_hidden_sizes[-1], output_features)
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x):
-        batch_size = x.size(0)
-        h0 = torch.zeros(self.num_layers, batch_size, self.hidden_size).to(x.device)
-        c0 = torch.zeros(self.num_layers, batch_size, self.hidden_size).to(x.device)
+        batch_size, sequence_length, _ = x.size()
 
-        x = self.dropout(x)
+        print('Before transpotition: ', x.size())
+        x = x.transpose(1, 2).float()
+        print('After transpotition: ', x.size())
+        print(x.size())
+        print(x.type())
+        x = self.conv1d(x)
+        print('After conv1d: ', x.size())
 
-        out, _ = self.lstm(x, (h0, c0))
-        out = out[:, -1, :]
-        out = self.fc(out)
-        out = out.unsqueeze(-1)
+        for conv_layer in self.conv_layers:
+            print('Before conv layer: ', x.size())
+            print('Conv layer: ', conv_layer)
+            x = conv_layer(x)
+            print('After conv layer: ', x.size())
+            x = torch.relu(x)
+            print('After relu: ', x.size())
+            x = self.dropout(x)
+            print('After dropout: ', x.size())
+
+        for lstm_layer in self.lstm_layers:
+            print('Before lstm layer: ', x.size())
+            h0 = torch.zeros(1, batch_size, lstm_layer.hidden_size).to(x.device)
+            c0 = torch.zeros(1, batch_size, lstm_layer.hidden_size).to(x.device)
+            print('h0: ', h0.size())
+            print('c0: ', c0.size())
+            x, _ = lstm_layer(x, (h0, c0))
+            print('After lstm layer: ', x.size())
+            x = self.dropout(x)
+            print('After dropout: ', x.size())
+
+        out = self.fc(x[:, -1, :])
+        print('After fc: ', out.size())
 
         return out
